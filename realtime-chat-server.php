@@ -202,10 +202,8 @@ function handleMessage($connection, $message, &$clients, &$userCounter) {
     
     switch ($type) {
         case 'auth':
-            echo "Auth message received: " . json_encode($message) . "\n";
             $userId = $message['user_id'] ?? $message['userId'] ?? ++$userCounter;
             $username = $message['username'] ?? 'User' . $userId;
-            echo "Extracted userId: $userId, username: $username\n";
             
             // Store client info
             $clients[] = [

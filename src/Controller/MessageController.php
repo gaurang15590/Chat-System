@@ -41,7 +41,7 @@ class MessageController extends AbstractController
             return $this->json(['error' => 'Sender not found'], 404);
         }
 
-        // Save message to database
+     
         $message = new Message();
         $message->setContent($data['content'])
                 ->setSender($sender)
@@ -51,10 +51,6 @@ class MessageController extends AbstractController
 
         $this->entityManager->persist($message);
         $this->entityManager->flush();
-
-        // For now, we'll handle message broadcasting within the WebSocket server directly
-        // In a multi-server setup, you could use Redis or database for synchronization
-
         return $this->json([
             'message' => 'Message sent successfully',
             'data' => json_decode($this->serializer->serialize($message, 'json', ['groups' => ['message:read']]))
@@ -88,7 +84,7 @@ class MessageController extends AbstractController
         
         $messages = $this->messageRepository->findRecentByRoom($roomId, $limit);
         
-        // Reverse to get chronological order (oldest first)
+      
         $messages = array_reverse($messages);
 
         return $this->json([
@@ -142,10 +138,10 @@ class MessageController extends AbstractController
     #[Route('/stats', name: 'stats', methods: ['GET'])]
     public function getStats(): JsonResponse
     {
-        // Get total message count
+        
         $totalMessages = $this->messageRepository->count([]);
         
-        // Get message count by room
+       
         $roomStats = $this->messageRepository->getMessageCountByRoom();
         
         return $this->json([

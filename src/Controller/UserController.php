@@ -30,7 +30,7 @@ class UserController extends AbstractController
             return $this->json(['error' => 'Username and email are required'], 400);
         }
 
-        // Check if user already exists
+    
         $existingUser = $this->userRepository->findByUsername($data['username']);
         if ($existingUser) {
             return $this->json(['error' => 'Username already exists'], 409);

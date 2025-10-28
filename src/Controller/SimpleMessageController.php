@@ -46,14 +46,14 @@ class SimpleMessageController extends AbstractController
         $limit = min(100, max(1, $request->query->getInt('limit', 20)));
         $lastId = $request->query->getInt('lastId', 0);
         
-        // Filter messages by room and ID
+       
         $roomMessages = array_filter(self::$messages, function($msg) use ($roomId, $lastId) {
             return $msg['roomId'] === $roomId && $msg['id'] > $lastId;
         });
 
-        // Get most recent messages
+        
         $roomMessages = array_slice(array_reverse($roomMessages), 0, $limit);
-        $roomMessages = array_reverse($roomMessages); // Chronological order
+        $roomMessages = array_reverse($roomMessages); 
 
         return $this->json([
             'messages' => array_values($roomMessages),

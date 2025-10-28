@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Debug Test</title>
+</head>
+<body>
+    <h1>Chat Debug Test</h1>
+    
+    <div>
+        <h3>1. Create User</h3>
+        <button onclick="createUser()">Create Test User</button>
+        <div id="user-result"></div>
+    </div>
+    
+    <div>
+        <h3>2. Send Message</h3>
+        <input type="text" id="message-text" placeholder="Enter message" value="Hello World!">
+        <button onclick="sendMessage()">Send Message</button>
+        <div id="send-result"></div>
+    </div>
+    
+    <div>
+        <h3>3. Get Messages</h3>
+        <button onclick="getMessages()">Get Messages</button>
+        <div id="messages-result"></div>
+    </div>
+
+    <script>
+        let userId = null;
+
+        async function createUser() {
+            try {
+                const response = await fetch('./api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'TestUser', email: 'test@example.com' })
+                });
+                const result = await response.json();
+                userId = result.user.id;
+                document.getElementById('user-result').innerHTML = 
+                    '<strong>Success!</strong> User ID: ' + userId + ' Username: ' + result.user.username;
+                console.log('User created:', result);
+            } catch (error) {
+                document.getElementById('user-result').innerHTML = '<strong>Error:</strong> ' + error.message;
+                console.error('User creation error:', error);
+            }
+        }
+
+        async function sendMessage() {
+            if (!userId) {
+                alert('Create user first!');
+                return;
+            }
+            
+            const content = document.getElementById('message-text').value;
+            try {
+                const response = await fetch('./api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        sender_id: userId, 
+                        content: content, 
+                        room_id: 'general' 
+                    })
+                });
+                const result = await response.json();
+                document.getElementById('send-result').innerHTML = 
+                    '<strong>Success!</strong> Message ID: ' + result.data.id + ' Content: ' + result.data.content;
+                console.log('Message sent:', result);
+            } catch (error) {
+                document.getElementById('send-result').innerHTML = '<strong>Error:</strong> ' + error.message;
+                console.error('Send error:', error);
+            }
+        }
+
+        async function getMessages() {
+            try {
+                const response = await fetch('./api/messages/room/general/recent');
+                const result = await response.json();
+                
+                let html = '<strong>Found ' + result.count + ' messages:</strong><br>';
+                result.messages.forEach(msg => {
+                    html += `<div style="border: 1px solid #ccc; margin: 5px; padding: 5px;">
+                        ID: ${msg.id}, Sender: ${msg.senderUsername}, Content: ${msg.content}, Time: ${msg.timestamp}
+                    </div>`;
+                });
+                
+                document.getElementById('messages-result').innerHTML = html;
+                console.log('Messages retrieved:', result);
+            } catch (error) {
+                document.getElementById('messages-result').innerHTML = '<strong>Error:</strong> ' + error.message;
+                console.error('Get messages error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

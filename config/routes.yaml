@@ -1,0 +1,40 @@
+controllers:
+    resource: ../src/Controller/
+    type: attribute
+
+# Manual route for testing
+home:
+    path: /
+    controller: App\Controller\HomeController::index
+    
+chat_room:
+    path: /room/{roomId}
+    controller: App\Controller\HomeController::room
+    defaults:
+        roomId: general
+
+# API Routes  
+api_users_create:
+    path: /api/users
+    controller: App\Controller\SimpleUserController::create
+    methods: [POST]
+
+api_users_list:
+    path: /api/users
+    controller: App\Controller\SimpleUserController::list
+    methods: [GET]
+
+api_users_get_by_username:
+    path: /api/users/username/{username}
+    controller: App\Controller\SimpleUserController::getByUsername
+    methods: [GET]
+
+api_messages_create:
+    path: /api/messages
+    controller: App\Controller\SimpleMessageController::create
+    methods: [POST]
+
+api_messages_get_recent:
+    path: /api/messages/room/{roomId}/recent
+    controller: App\Controller\SimpleMessageController::getRecent
+    methods: [GET]

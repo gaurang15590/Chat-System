@@ -1,0 +1,25 @@
+# Symfony application structure
+/vendor/
+/var/
+/public/build/
+.env.local
+.env.local.php
+.env.*.local
+node_modules/
+npm-debug.log
+yarn-error.log
+###> symfony/phpunit-bridge ###
+.phpunit.result.cache
+/phpunit.xml
+###< symfony/phpunit-bridge ###
+.idea/
+*.log
+###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+/vendor/
+###< symfony/framework-bundle ###

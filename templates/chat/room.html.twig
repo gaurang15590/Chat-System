@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>{{ roomId|title }} - Real-time Chat</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="/css/chat.css">
+    </head>
+    <body>
+        <div id="chat-container">
+            <div id="sidebar">
+                <div class="sidebar-header">
+                    <h3>Chat Rooms</h3>
+                    <a href="{{ path('home') }}" class="back-link">← Back to Home</a>
+                </div>
+                <div id="rooms-list">
+                    <div class="room-item {% if roomId == 'general' %}active{% endif %}" data-room="general">
+                        <span class="room-name"># general</span>
+                        <span class="user-count" id="general-count">0</span>
+                    </div>
+                    <div class="room-item {% if roomId == 'random' %}active{% endif %}" data-room="random">
+                        <span class="room-name"># random</span>
+                        <span class="user-count" id="random-count">0</span>
+                    </div>
+                    <div class="room-item {% if roomId == 'tech' %}active{% endif %}" data-room="tech">
+                        <span class="room-name"># tech</span>
+                        <span class="user-count" id="tech-count">0</span>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <h4>Online Users</h4>
+                    <div id="online-users">
+                        <!-- Online users will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <div id="main-chat">
+                <div id="chat-header">
+                    <h2 id="current-room"># {{ roomId }}</h2>
+                    <div id="connection-status" class="disconnected">Disconnected</div>
+                </div>
+
+                <div id="messages-container">
+                    <div id="messages">
+                        <!-- Messages will be populated here -->
+                    </div>
+                </div>
+
+                <div id="message-input-container">
+                    <div id="user-info">
+                        <input type="text" id="username-input" placeholder="Enter your username" />
+                        <button id="connect-btn">Connect</button>
+                    </div>
+                    
+                    <div id="message-form" style="display: none;">
+                        <input type="text" id="message-input" placeholder="Type your message..." />
+                        <button id="send-btn">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User authentication modal -->
+        <div id="auth-modal" class="modal">
+            <div class="modal-content">
+                <h3>Join {{ roomId|title }} Room</h3>
+                <form id="auth-form">
+                    <div class="form-group">
+                        <label for="modal-username">Username:</label>
+                        <input type="text" id="modal-username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="modal-email">Email:</label>
+                        <input type="email" id="modal-email" required>
+                    </div>
+                    <button type="submit">Join {{ roomId|title }}</button>
+                </form>
+            </div>
+        </div>
+
+        <script>
+            // Set initial room from server
+            window.INITIAL_ROOM = '{{ roomId }}';
+        </script>
+        <script src="/js/chat.js"></script>
+    </body>
+</html>

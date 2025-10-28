@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Chat System</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 50px auto; 
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .chat-container { 
+            background: white; 
+            border-radius: 10px; 
+            padding: 20px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .messages { 
+            height: 400px; 
+            overflow-y: auto; 
+            border: 1px solid #ddd; 
+            padding: 10px; 
+            margin-bottom: 20px; 
+            background-color: #fafafa;
+        }
+        .message { 
+            margin-bottom: 10px; 
+            padding: 8px; 
+            background: #e3f2fd; 
+            border-radius: 5px;
+        }
+        .message strong { color: #1976d2; }
+        .input-area { 
+            display: flex; 
+            gap: 10px; 
+        }
+        .input-area input { 
+            flex: 1; 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 5px;
+        }
+        .input-area button { 
+            padding: 10px 20px; 
+            background: #1976d2; 
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer;
+        }
+        .input-area button:hover { background: #1565c0; }
+        .status { 
+            margin-bottom: 10px; 
+            padding: 5px; 
+            background: #e8f5e8; 
+            border-radius: 3px;
+        }
+        .login-form { 
+            background: #fff3cd; 
+            padding: 15px; 
+            border-radius: 5px; 
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <h1>💬 Simple Chat System</h1>
+        
+        <div id="login-form" class="login-form">
+            <h3>Join the Chat</h3>
+            <input type="text" id="username" placeholder="Your username" required>
+            <input type="email" id="email" placeholder="Your email" required>
+            <button onclick="login()">Join Chat</button>
+        </div>
+
+        <div id="chat-area" style="display: none;">
+            <div class="status" id="status">Connected as: <span id="current-user"></span></div>
+            
+            <div id="messages" class="messages"></div>
+            
+            <div class="input-area">
+                <input type="text" id="message-input" placeholder="Type your message..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let lastMessageId = 0;
+
+        async function login() {
+            const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
+            
+            if (!username || !email) {
+                alert('Please enter both username and email');
+                return;
+            }
+
+            try {
+                console.log('Attempting login for:', username, email);
+                
+                // Create or get user
+                const response = await fetch('./api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email })
+                });
+
+                console.log('Login response status:', response.status);
+                const result = await response.json();
+                console.log('Login result:', result);
+                currentUser = result.user;
+                
+                document.getElementById('current-user').textContent = username;
+                document.getElementById('login-form').style.display = 'none';
+                document.getElementById('chat-area').style.display = 'block';
+                
+                // Start polling for messages
+                pollMessages();
+                
+            } catch (error) {
+                alert('Login failed: ' + error.message);
+            }
+        }
+
+        async function sendMessage() {
+            const messageInput = document.getElementById('message-input');
+            const content = messageInput.value.trim();
+            
+            if (!content || !currentUser) {
+                console.log('Cannot send message:', { content, currentUser });
+                return;
+            }
+
+            try {
+                console.log('Sending message:', content, 'from user:', currentUser);
+                
+                const response = await fetch('./api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sender_id: currentUser.id,
+                        content: content,
+                        room_id: 'general'
+                    })
+                });
+
+                console.log('Message send response:', response.status);
+                const result = await response.json();
+                console.log('Message result:', result);
+
+                messageInput.value = '';
+                // Messages will be updated by polling
+                
+            } catch (error) {
+                console.error('Send message error:', error);
+                alert('Failed to send message: ' + error.message);
+            }
+        }
+
+        async function pollMessages() {
+            if (!currentUser) {
+                console.log('No current user, skipping poll');
+                setTimeout(pollMessages, 1000);
+                return;
+            }
+
+            try {
+                console.log('Polling for messages, lastId:', lastMessageId);
+                const response = await fetch(`./api/messages/room/general/recent?lastId=${lastMessageId}`);
+                const data = await response.json();
+                console.log('Poll response:', data);
+                
+                if (data.messages && data.messages.length > 0) {
+                    console.log('Found', data.messages.length, 'messages');
+                    data.messages.forEach(message => {
+                        addMessageToChat(message);
+                        lastMessageId = Math.max(lastMessageId, message.id);
+                    });
+                } else {
+                    console.log('No new messages');
+                }
+            } catch (error) {
+                console.error('Polling error:', error);
+            }
+
+            // Poll again in 1 second
+            setTimeout(pollMessages, 1000);
+        }
+
+        function addMessageToChat(message) {
+            console.log('Adding message to chat:', message);
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `
+                <strong>${message.senderUsername || 'User' + message.senderId}:</strong> 
+                ${message.content}
+                <small style="float: right; color: #666;">${new Date(message.timestamp).toLocaleTimeString()}</small>
+            `;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>

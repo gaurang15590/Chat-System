@@ -1,0 +1,51 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+
+
+    # ReactPHP event loop as service
+    React\EventLoop\LoopInterface:
+        factory: ['React\EventLoop\Loop', 'get']
+
+    # Message Broker Interface - using in-memory implementation
+    App\Service\MessageBrokerInterface:
+        class: App\Service\InMemoryMessageBroker
+        arguments:
+            $logger: '@logger'
+            $loop: '@React\EventLoop\LoopInterface'
+
+    # WebSocket Fleet Manager
+    App\Service\WebSocketFleetManager:
+        arguments:
+            $logger: '@logger'
+            $loop: '@React\EventLoop\LoopInterface'
+            $messageBroker: '@App\Service\MessageBrokerInterface'
+
+    # Fleet WebSocket Server
+    App\WebSocket\FleetWebSocketServer:
+        arguments:
+            $host: '%env(WEBSOCKET_HOST)%'
+            $port: '%env(int:WEBSOCKET_PORT)%'
+            $loop: '@React\EventLoop\LoopInterface'
+            $userRepository: '@App\Repository\UserRepository'
+            $entityManager: '@doctrine.orm.entity_manager'
+            $messageBroker: '@App\Service\MessageBrokerInterface'
+            $fleetManager: '@App\Service\WebSocketFleetManager'
+            $serializer: '@serializer'
+            $logger: '@logger'
+
+    # Legacy WebSocket Server (kept for compatibility)
+    App\WebSocket\WebSocketServer:
+        arguments:
+            $host: '%env(WEBSOCKET_HOST)%'
+            $port: '%env(int:WEBSOCKET_PORT)%'
+            $loop: '@React\EventLoop\LoopInterface'

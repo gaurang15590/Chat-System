@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Server WebSocket Chat Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1200px;
+        }
+        .server-panel {
+            flex: 1;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .server-header {
+            background: #007bff;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.disconnected { background: #f8d7da; color: #721c24; }
+        .status.connecting { background: #fff3cd; color: #856404; }
+        .messages {
+            height: 300px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+        .message {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .message.own { background: #e3f2fd; }
+        .message.other { background: #f1f8e9; }
+        .message.system { background: #fff3e0; color: #e65100; }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .connect-btn { background: #28a745; color: white; }
+        .disconnect-btn { background: #dc3545; color: white; }
+        .send-btn { background: #007bff; color: white; }
+        .clear-btn { background: #6c757d; color: white; }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🌐 Multi-Server WebSocket Chat Test</h1>
+    <p>This page connects to multiple WebSocket servers to test cross-server messaging.</p>
+    
+    <div class="container">
+        <!-- Server 1 Panel -->
+        <div class="server-panel">
+            <div class="server-header">
+                <h3>🖥️ Server 1 (Port 8080)</h3>
+            </div>
+            
+            <div id="status1" class="status disconnected">Disconnected</div>
+            
+            <div class="input-group">
+                <input type="text" id="username1" placeholder="Enter username for Server 1" value="User_Server1">
+            </div>
+            
+            <div class="controls">
+                <button class="connect-btn" onclick="connectServer1()">Connect</button>
+                <button class="disconnect-btn" onclick="disconnectServer1()">Disconnect</button>
+                <button class="clear-btn" onclick="clearMessages1()">Clear</button>
+            </div>
+            
+            <div id="messages1" class="messages"></div>
+            
+            <div class="input-group">
+                <input type="text" id="messageInput1" placeholder="Type message for Server 1..." onkeypress="handleKeyPress(event, 1)">
+                <button class="send-btn" onclick="sendMessage1()">Send</button>
+            </div>
+        </div>
+        
+        <!-- Server 2 Panel -->
+        <div class="server-panel">
+            <div class="server-header">
+                <h3>🖥️ Server 2 (Port 8082)</h3>
+            </div>
+            
+            <div id="status2" class="status disconnected">Disconnected</div>
+            
+            <div class="input-group">
+                <input type="text" id="username2" placeholder="Enter username for Server 2" value="User_Server2">
+            </div>
+            
+            <div class="controls">
+                <button class="connect-btn" onclick="connectServer2()">Connect</button>
+                <button class="disconnect-btn" onclick="disconnectServer2()">Disconnect</button>
+                <button class="clear-btn" onclick="clearMessages2()">Clear</button>
+            </div>
+            
+            <div id="messages2" class="messages"></div>
+            
+            <div class="input-group">
+                <input type="text" id="messageInput2" placeholder="Type message for Server 2..." onkeypress="handleKeyPress(event, 2)">
+                <button class="send-btn" onclick="sendMessage2()">Send</button>
+            </div>
+        </div>
+    </div>
+    
+    <div style="margin-top: 20px; padding: 15px; background: #e9ecef; border-radius: 5px;">
+        <h4>📝 Testing Instructions:</h4>
+        <ol>
+            <li>Connect to both servers using different usernames</li>
+            <li>Send messages from Server 1 - they should appear on both servers</li>
+            <li>Send messages from Server 2 - they should appear on both servers</li>
+            <li>This tests the cross-server pub/sub messaging system</li>
+        </ol>
+    </div>
+
+    <script>
+        let socket1 = null;
+        let socket2 = null;
+        let user1Id = null;
+        let user2Id = null;
+
+        function log(serverId, message, type = 'system') {
+            const messagesDiv = document.getElementById(`messages${serverId}`);
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${message}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function updateStatus(serverId, status, text) {
+            const statusDiv = document.getElementById(`status${serverId}`);
+            statusDiv.className = `status ${status}`;
+            statusDiv.textContent = text;
+        }
+
+        // Server 1 Functions
+        function connectServer1() {
+            if (socket1) return;
+            
+            const username = document.getElementById('username1').value || 'User_Server1';
+            updateStatus(1, 'connecting', 'Connecting to Server 1...');
+            log(1, '🔄 Connecting to WebSocket Server 1 (port 8080)...');
+
+            socket1 = new WebSocket('ws://127.0.0.1:8080');
+
+            socket1.onopen = function() {
+                updateStatus(1, 'connected', 'Connected to Server 1');
+                log(1, '✅ Connected to Server 1');
+                
+                // Create user
+                createUser(username, 1);
+            };
+
+            socket1.onmessage = function(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    handleServerMessage(1, message);
+                } catch (e) {
+                    log(1, `📨 Raw: ${event.data}`);
+                }
+            };
+
+            socket1.onclose = function() {
+                updateStatus(1, 'disconnected', 'Disconnected from Server 1');
+                log(1, '❌ Disconnected from Server 1');
+                socket1 = null;
+            };
+
+            socket1.onerror = function(error) {
+                log(1, `⚠️  Error: ${error}`);
+            };
+        }
+
+        function disconnectServer1() {
+            if (socket1) {
+                socket1.close();
+                socket1 = null;
+            }
+        }
+
+        function sendMessage1() {
+            const input = document.getElementById('messageInput1');
+            const message = input.value.trim();
+            if (!message || !socket1 || socket1.readyState !== WebSocket.OPEN) return;
+
+            if (user1Id) {
+                // Send via API to ensure cross-server sync
+                fetch('/api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: message,
+                        sender_id: user1Id,
+                        room_id: 'general',
+                        message_type: 'text'
+                    })
+                }).then(() => {
+                    log(1, `📤 Sent: ${message}`, 'own');
+                    input.value = '';
+                }).catch(err => {
+                    log(1, `❌ Send failed: ${err.message}`);
+                });
+            }
+        }
+
+        // Server 2 Functions  
+        function connectServer2() {
+            if (socket2) return;
+            
+            const username = document.getElementById('username2').value || 'User_Server2';
+            updateStatus(2, 'connecting', 'Connecting to Server 2...');
+            log(2, '🔄 Connecting to WebSocket Server 2 (port 8082)...');
+
+            socket2 = new WebSocket('ws://127.0.0.1:8082');
+
+            socket2.onopen = function() {
+                updateStatus(2, 'connected', 'Connected to Server 2');
+                log(2, '✅ Connected to Server 2');
+                
+                // Create user
+                createUser(username, 2);
+            };
+
+            socket2.onmessage = function(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    handleServerMessage(2, message);
+                } catch (e) {
+                    log(2, `📨 Raw: ${event.data}`);
+                }
+            };
+
+            socket2.onclose = function() {
+                updateStatus(2, 'disconnected', 'Disconnected from Server 2');
+                log(2, '❌ Disconnected from Server 2');
+                socket2 = null;
+            };
+
+            socket2.onerror = function(error) {
+                log(2, `⚠️  Error: ${error}`);
+            };
+        }
+
+        function disconnectServer2() {
+            if (socket2) {
+                socket2.close();
+                socket2 = null;
+            }
+        }
+
+        function sendMessage2() {
+            const input = document.getElementById('messageInput2');
+            const message = input.value.trim();
+            if (!message || !socket2 || socket2.readyState !== WebSocket.OPEN) return;
+
+            if (user2Id) {
+                // Send via API to ensure cross-server sync
+                fetch('/api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: message,
+                        sender_id: user2Id,
+                        room_id: 'general',
+                        message_type: 'text'
+                    })
+                }).then(() => {
+                    log(2, `📤 Sent: ${message}`, 'own');
+                    input.value = '';
+                }).catch(err => {
+                    log(2, `❌ Send failed: ${err.message}`);
+                });
+            }
+        }
+
+        // Utility Functions
+        function handleKeyPress(event, serverId) {
+            if (event.key === 'Enter') {
+                if (serverId === 1) sendMessage1();
+                else if (serverId === 2) sendMessage2();
+            }
+        }
+
+        function clearMessages1() {
+            document.getElementById('messages1').innerHTML = '';
+        }
+
+        function clearMessages2() {
+            document.getElementById('messages2').innerHTML = '';
+        }
+
+        async function createUser(username, serverId) {
+            try {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: username,
+                        email: `${username}@test.com`
+                    })
+                });
+
+                if (response.ok) {
+                    const userData = await response.json();
+                    if (serverId === 1) {
+                        user1Id = userData.user.id;
+                        log(1, `👤 User created: ${username} (ID: ${user1Id})`);
+                        joinRoom(1, 'general');
+                    } else {
+                        user2Id = userData.user.id;
+                        log(2, `👤 User created: ${username} (ID: ${user2Id})`);
+                        joinRoom(2, 'general');
+                    }
+                } else {
+                    log(serverId, `⚠️  User creation failed: ${response.statusText}`);
+                }
+            } catch (error) {
+                log(serverId, `❌ Error creating user: ${error.message}`);
+            }
+        }
+
+        function joinRoom(serverId, roomId) {
+            const socket = serverId === 1 ? socket1 : socket2;
+            const userId = serverId === 1 ? user1Id : user2Id;
+            
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: 'auth',
+                    user_id: userId
+                }));
+                
+                socket.send(JSON.stringify({
+                    type: 'join_room',
+                    room_id: roomId
+                }));
+                
+                log(serverId, `🏠 Joined room: ${roomId}`);
+            }
+        }
+
+        function handleServerMessage(serverId, message) {
+            switch (message.type) {
+                case 'welcome':
+                case 'connected':
+                    log(serverId, `🎉 ${message.message}`);
+                    break;
+                case 'message':
+                    const isOwn = (serverId === 1 && message.sender_id == user1Id) || 
+                                 (serverId === 2 && message.sender_id == user2Id);
+                    log(serverId, `💬 ${message.sender_username || 'User'}: ${message.content}`, 
+                        isOwn ? 'own' : 'other');
+                    break;
+                case 'user_joined':
+                    log(serverId, `👋 ${message.username} joined ${message.room_id}`);
+                    break;
+                case 'error':
+                    log(serverId, `⚠️  Error: ${message.message}`);
+                    break;
+                default:
+                    log(serverId, `📨 ${JSON.stringify(message)}`);
+            }
+        }
+    </script>
+</body>
+</html>

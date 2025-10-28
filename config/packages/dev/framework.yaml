@@ -1,0 +1,14 @@
+framework:
+    assets:
+        packages:
+            app:
+                json_manifest_path: '%kernel.project_dir%/public/build/manifest.json'
+
+when@dev:
+    framework:
+        router:
+            strict_requirements: true
+
+when@test:
+    framework:
+        test: true

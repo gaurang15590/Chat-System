@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Server Fleet Test</title>
+    <style>
+        body { font-family: monospace; margin: 20px; background: #1a1a1a; color: #0f0; }
+        .server-test { 
+            border: 1px solid #333; 
+            margin: 20px 0; 
+            padding: 20px; 
+            background: #2a2a2a;
+            border-radius: 5px;
+        }
+        .server-header { 
+            color: #ff0; 
+            font-weight: bold; 
+            margin-bottom: 10px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        .log { 
+            height: 300px; 
+            overflow-y: auto; 
+            border: 1px solid #333; 
+            padding: 10px; 
+            background: #1a1a1a;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .controls { 
+            margin: 10px 0; 
+        }
+        input, button { 
+            background: #333; 
+            border: 1px solid #666; 
+            color: #0f0; 
+            padding: 5px 10px; 
+            margin: 5px;
+        }
+        button:hover { background: #444; cursor: pointer; }
+        .success { color: #0f0; }
+        .error { color: #f00; }
+        .info { color: #00f; }
+        .warning { color: #fa0; }
+    </style>
+</head>
+<body>
+    <h1>🌐 Multi-Server WebSocket Fleet Test</h1>
+    <p>This test demonstrates real-time messaging across multiple WebSocket servers using pub/sub architecture.</p>
+
+    <div class="server-test">
+        <div class="server-header">📡 Server 1 - Port 8080 (Primary Fleet Server)</div>
+        <div class="controls">
+            <input type="text" id="username1" placeholder="Username" value="Alice">
+            <input type="text" id="email1" placeholder="Email" value="alice@test.com">
+            <button onclick="connectServer1()">Connect</button>
+            <button onclick="disconnectServer1()">Disconnect</button>
+        </div>
+        <div class="controls">
+            <input type="text" id="message1" placeholder="Message to send" style="width: 300px;">
+            <button onclick="sendMessage1()">Send Message</button>
+        </div>
+        <div id="log1" class="log"></div>
+    </div>
+
+    <div class="server-test">
+        <div class="server-header">📡 Server 2 - Port 8081 (Secondary Fleet Server)</div>
+        <div class="controls">
+            <input type="text" id="username2" placeholder="Username" value="Bob">
+            <input type="text" id="email2" placeholder="Email" value="bob@test.com">
+            <button onclick="connectServer2()">Connect</button>
+            <button onclick="disconnectServer2()">Disconnect</button>
+        </div>
+        <div class="controls">
+            <input type="text" id="message2" placeholder="Message to send" style="width: 300px;">
+            <button onclick="sendMessage2()">Send Message</button>
+        </div>
+        <div id="log2" class="log"></div>
+    </div>
+
+    <div class="server-test">
+        <div class="server-header">📊 Fleet Statistics & Cross-Server Communication Test</div>
+        <div class="controls">
+            <button onclick="testCrossServerMessaging()">🚀 Test Cross-Server Messaging</button>
+            <button onclick="getFleetStats()">📈 Get Fleet Statistics</button>
+            <button onclick="clearLogs()">🧹 Clear Logs</button>
+        </div>
+        <div id="statsLog" class="log"></div>
+    </div>
+
+    <script>
+        let socket1 = null;
+        let socket2 = null;
+        let user1 = null;
+        let user2 = null;
+
+        function log(serverId, message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEl = document.getElementById(`log${serverId}`);
+            const className = type;
+            logEl.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function statsLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEl = document.getElementById('statsLog');
+            const className = type;
+            logEl.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        async function createUser(username, email) {
+            try {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email })
+                });
+                const result = await response.json();
+                return result.user;
+            } catch (error) {
+                throw new Error('Failed to create user: ' + error.message);
+            }
+        }
+
+        async function connectServer1() {
+            try {
+                const username = document.getElementById('username1').value;
+                const email = document.getElementById('email1').value;
+                
+                log(1, `Creating user: ${username} (${email})`, 'info');
+                user1 = await createUser(username, email);
+                log(1, `User created with ID: ${user1.id}`, 'success');
+
+                log(1, 'Connecting to WebSocket server on port 8080...', 'info');
+                socket1 = new WebSocket('ws://127.0.0.1:8080');
+
+                socket1.onopen = () => {
+                    log(1, 'Connected to WebSocket server!', 'success');
+                    socket1.send(JSON.stringify({
+                        type: 'auth',
+                        user_id: user1.id
+                    }));
+                    socket1.send(JSON.stringify({
+                        type: 'join_room',
+                        room_id: 'general'
+                    }));
+                };
+
+                socket1.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    handleMessage(1, message);
+                };
+
+                socket1.onclose = () => {
+                    log(1, 'WebSocket connection closed', 'warning');
+                };
+
+                socket1.onerror = (error) => {
+                    log(1, 'WebSocket error: ' + error, 'error');
+                };
+
+            } catch (error) {
+                log(1, 'Connection failed: ' + error.message, 'error');
+            }
+        }
+
+        async function connectServer2() {
+            try {
+                const username = document.getElementById('username2').value;
+                const email = document.getElementById('email2').value;
+                
+                log(2, `Creating user: ${username} (${email})`, 'info');
+                user2 = await createUser(username, email);
+                log(2, `User created with ID: ${user2.id}`, 'success');
+
+                log(2, 'Connecting to WebSocket server on port 8081...', 'info');
+                socket2 = new WebSocket('ws://127.0.0.1:8081');
+
+                socket2.onopen = () => {
+                    log(2, 'Connected to WebSocket server!', 'success');
+                    socket2.send(JSON.stringify({
+                        type: 'auth',
+                        user_id: user2.id
+                    }));
+                    socket2.send(JSON.stringify({
+                        type: 'join_room',
+                        room_id: 'general'
+                    }));
+                };
+
+                socket2.onmessage = (event) => {
+                    const message = JSON.parse(event.data);
+                    handleMessage(2, message);
+                };
+
+                socket2.onclose = () => {
+                    log(2, 'WebSocket connection closed', 'warning');
+                };
+
+                socket2.onerror = (error) => {
+                    log(2, 'WebSocket error: ' + error, 'error');
+                };
+
+            } catch (error) {
+                log(2, 'Connection failed: ' + error.message, 'error');
+            }
+        }
+
+        function handleMessage(serverId, message) {
+            switch (message.type) {
+                case 'connected':
+                    log(serverId, `Connected to server: ${message.server_id}`, 'success');
+                    break;
+                case 'auth_success':
+                    log(serverId, 'Authentication successful!', 'success');
+                    break;
+                case 'joined_room':
+                    log(serverId, `Joined room: ${message.room_id}`, 'success');
+                    break;
+                case 'chat_message':
+                    const sender = message.sender ? message.sender.username : 'Unknown';
+                    const serverInfo = message.server_id ? ` [from ${message.server_id}]` : '';
+                    log(serverId, `💬 ${sender}: ${message.content}${serverInfo}`, 'success');
+                    
+                    // If this message is from a different server, highlight it
+                    if (message.server_id && !message.server_id.includes(`808${serverId-1}`)) {
+                        statsLog(`🔄 Cross-server message detected! Message from ${message.server_id} received on server ${serverId}`, 'warning');
+                    }
+                    break;
+                case 'error':
+                    log(serverId, `❌ Error: ${message.message}`, 'error');
+                    break;
+                default:
+                    log(serverId, `📥 ${message.type}: ${JSON.stringify(message)}`, 'info');
+            }
+        }
+
+        function sendMessage1() {
+            const message = document.getElementById('message1').value.trim();
+            if (!message || !socket1) return;
+
+            socket1.send(JSON.stringify({
+                type: 'chat_message',
+                content: message,
+                room_id: 'general'
+            }));
+
+            document.getElementById('message1').value = '';
+            log(1, `📤 Sending: ${message}`, 'info');
+        }
+
+        function sendMessage2() {
+            const message = document.getElementById('message2').value.trim();
+            if (!message || !socket2) return;
+
+            socket2.send(JSON.stringify({
+                type: 'chat_message',
+                content: message,
+                room_id: 'general'
+            }));
+
+            document.getElementById('message2').value = '';
+            log(2, `📤 Sending: ${message}`, 'info');
+        }
+
+        function disconnectServer1() {
+            if (socket1) {
+                socket1.close();
+                socket1 = null;
+                log(1, 'Disconnected from server', 'warning');
+            }
+        }
+
+        function disconnectServer2() {
+            if (socket2) {
+                socket2.close();
+                socket2 = null;
+                log(2, 'Disconnected from server', 'warning');
+            }
+        }
+
+        async function testCrossServerMessaging() {
+            statsLog('🚀 Starting cross-server messaging test...', 'info');
+            
+            if (!socket1 || !socket2) {
+                statsLog('❌ Both servers must be connected for cross-server test', 'error');
+                return;
+            }
+
+            // Send message from server 1
+            setTimeout(() => {
+                if (socket1) {
+                    socket1.send(JSON.stringify({
+                        type: 'chat_message',
+                        content: '👋 Hello from Server 1! Testing cross-server messaging...',
+                        room_id: 'general'
+                    }));
+                    statsLog('📤 Sent test message from Server 1', 'info');
+                }
+            }, 1000);
+
+            // Send message from server 2
+            setTimeout(() => {
+                if (socket2) {
+                    socket2.send(JSON.stringify({
+                        type: 'chat_message',
+                        content: '👋 Hello from Server 2! Cross-server messaging is working!',
+                        room_id: 'general'
+                    }));
+                    statsLog('📤 Sent test message from Server 2', 'info');
+                }
+            }, 2000);
+
+            setTimeout(() => {
+                statsLog('✅ Cross-server messaging test completed. Check server logs for message delivery.', 'success');
+            }, 3000);
+        }
+
+        async function getFleetStats() {
+            try {
+                statsLog('📊 Fetching fleet statistics...', 'info');
+                
+                // Get user statistics from existing endpoint
+                try {
+                    const usersResponse = await fetch('/api/users');
+                    const usersData = await usersResponse.json();
+                    statsLog(`👥 Total users: ${usersData.users ? usersData.users.length : 0}`, 'success');
+                } catch (userError) {
+                    statsLog('⚠️  User stats not available', 'warning');
+                }
+                
+                // Get message statistics from existing endpoint for general room
+                try {
+                    const messagesResponse = await fetch('/api/messages/room/general/recent?limit=50');
+                    const messagesData = await messagesResponse.json();
+                    statsLog(`💬 Recent messages in general: ${messagesData.count || 0}`, 'success');
+                } catch (msgError) {
+                    statsLog('⚠️  Message stats not available', 'warning');
+                }
+                
+                statsLog('✅ Fleet stats retrieved successfully!', 'success');
+                
+            } catch (error) {
+                statsLog('❌ Failed to fetch fleet stats: ' + error.message, 'error');
+            }
+        }
+
+        function clearLogs() {
+            document.getElementById('log1').innerHTML = '';
+            document.getElementById('log2').innerHTML = '';
+            document.getElementById('statsLog').innerHTML = '';
+            statsLog('🧹 Logs cleared', 'info');
+        }
+
+        // Auto-test functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            statsLog('🌐 Multi-Server WebSocket Fleet Test Interface Ready', 'success');
+            statsLog('📋 Instructions:', 'info');
+            statsLog('1. Connect both servers (they will connect to different ports)', 'info');
+            statsLog('2. Send messages from each server', 'info');
+            statsLog('3. Observe messages appearing on both servers (cross-server sync)', 'info');
+            statsLog('4. Use "Test Cross-Server Messaging" for automated test', 'info');
+            statsLog('', 'info');
+            statsLog('🔧 Architecture: ReactPHP WebSocket + In-Memory Pub/Sub + Doctrine ORM', 'info');
+        });
+    </script>
+</body>
+</html>
